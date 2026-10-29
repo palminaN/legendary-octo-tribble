@@ -1,0 +1,7 @@
+{
+  "name": "com.legendary_octo_tribble.native_host",
+  "description": "legendary-octo-tribble native messaging host",
+  "path": "C:\\absolute\\path\\to\\dm-native-host.exe",
+  "type": "stdio",
+  "allowed_extensions": ["dm@legendary-octo-tribble"]
+}

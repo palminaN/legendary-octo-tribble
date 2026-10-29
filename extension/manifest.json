@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "legendary-octo-tribble Download Manager",
+  "version": "0.1.0",
+  "description": "Hands downloads off to the local Rust download manager.",
+  "permissions": ["downloads", "nativeMessaging"],
+  "background": {
+    "service_worker": "background.js",
+    "scripts": ["background.js"]
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "all_frames": true
+    }
+  ],
+  "action": {
+    "default_popup": "popup/popup.html"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "dm@legendary-octo-tribble",
+      "strict_min_version": "121.0"
+    }
+  }
+}
