@@ -44,7 +44,41 @@ cargo build --workspace
      Load the extension via `about:debugging#/runtime/this-firefox` → **Load Temporary Add-on…** →
      pick `extension/manifest.json`.
 
+## Streaming videos
+
+The extension watches network requests (`webRequest`) for HLS (`.m3u8`), DASH (`.mpd`) and
+direct video files loaded by players, and lists them in the toolbar popup (the badge shows how
+many were found). The overlay button on a streaming player downloads the best one detected.
+Cookie/Referer/User-Agent headers are captured and replayed so session-protected streams work.
+
+Stream downloads are delegated to [ffmpeg](https://ffmpeg.org), which handles playlist parsing,
+AES-128 decryption and audio/video muxing. It must be on `PATH`, or set `DM_FFMPEG` to its
+path. Files go to the user's Downloads folder, named after the page title.
+
+### Video sites (YouTube…)
+
+YouTube never loads a plain manifest, so on YouTube pages (and embedded YouTube players) the
+extension sends the *page* URL to [yt-dlp](https://github.com/yt-dlp/yt-dlp) instead. yt-dlp is
+also the fallback when nothing was detected on a page, since it supports many other sites
+(Vimeo, Twitch, Dailymotion…). Install it, plus [Deno](https://deno.com), which yt-dlp needs to
+solve YouTube's player challenges:
+
+```
+winget install yt-dlp.yt-dlp DenoLand.Deno
+```
+
+Clicking the overlay button on a player opens a quality menu (resolutions with approximate
+sizes, plus audio only), listed by yt-dlp for both video sites and detected HLS/DASH streams.
+Without yt-dlp, detected streams still offer "Best quality" through ffmpeg.
+
+yt-dlp must be on `PATH`, or set `DM_YTDLP` to its path. Keep it up to date (`yt-dlp -U`):
+YouTube changes regularly and old versions stop working.
+
+Not supported: DRM-protected streams (Netflix, Disney+…).
+
 ## Roadmap (not implemented yet)
+
+- Cancel a running download (and kill its ffmpeg process if the host is killed)
 
 - Parallel chunked downloads with `Range` requests and resume after interruption
 - Persistent download queue (survive app restarts)

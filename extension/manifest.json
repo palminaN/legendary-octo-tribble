@@ -3,7 +3,8 @@
   "name": "legendary-octo-tribble Download Manager",
   "version": "0.1.0",
   "description": "Hands downloads off to the local Rust download manager.",
-  "permissions": ["downloads", "nativeMessaging"],
+  "permissions": ["downloads", "nativeMessaging", "webRequest", "storage"],
+  "host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "background.js",
     "scripts": ["background.js"]

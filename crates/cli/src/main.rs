@@ -17,13 +17,12 @@ async fn main() -> anyhow::Result<()> {
     let request = DownloadRequest {
         url: args.url,
         destination: args.output,
+        headers: Vec::new(),
     };
 
-    download(&request, |progress| {
-        match progress.total {
-            Some(total) => print!("\r{} / {} bytes", progress.downloaded, total),
-            None => print!("\r{} bytes", progress.downloaded),
-        }
+    download(&request, |progress| match progress.total {
+        Some(total) => print!("\r{} / {} bytes", progress.downloaded, total),
+        None => print!("\r{} bytes", progress.downloaded),
     })
     .await?;
 

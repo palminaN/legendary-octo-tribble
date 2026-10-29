@@ -13,3 +13,4 @@ dm-core = { path = "../core" }
 tokio = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+dirs = "6"
