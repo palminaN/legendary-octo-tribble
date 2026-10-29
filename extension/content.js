@@ -150,7 +150,12 @@ function menuItem(option, target) {
   item.append(label, size);
   item.addEventListener("click", (event) => {
     event.stopPropagation();
-    chrome.runtime.sendMessage({ type: "download-format", target, selector: option.selector });
+    chrome.runtime.sendMessage({
+      type: "download-format",
+      target,
+      selector: option.selector,
+      label: option.label,
+    });
     closeMenu();
     button.textContent = "✓ Sent";
   });

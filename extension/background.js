@@ -9,16 +9,24 @@ const FORWARDED_HEADERS = ["cookie", "referer", "origin", "user-agent", "authori
 // Smaller "videos" are almost always segments of a stream, previews or ads.
 const MIN_VIDEO_SIZE = 1024 * 1024;
 
-// The native host handles one request at a time, so each download gets its
-// own port (and therefore its own host process) to run in parallel.
-function sendToHost(message) {
-  const port = chrome.runtime.connectNative(NATIVE_HOST_NAME);
-  port.onMessage.addListener((response) => {
-    // TODO: forward progress/done/error events to the popup UI.
-    console.log("native host:", message.url, response);
-    if (response.type === "done" || response.type === "error") port.disconnect();
+// Every download opens its own window (download/), where the user picks the
+// folder and follows the progress. The window runs the native host request
+// itself, each in its own host process, so downloads run in parallel. The
+// request is handed over through storage.session, keyed by a random id.
+async function startDownload(request, label) {
+  if (request.type === "download") {
+    // Some servers reject clients without a browser User-Agent. (Not for
+    // yt-dlp, which picks its own per site.)
+    request = { ...request, headers: { "User-Agent": navigator.userAgent, ...request.headers } };
+  }
+  const id = crypto.randomUUID();
+  await chrome.storage.session.set({ [`download:${id}`]: { request, label: label || request.url } });
+  await chrome.windows.create({
+    url: chrome.runtime.getURL(`download/download.html?id=${id}`),
+    type: "popup",
+    width: 520,
+    height: 300,
   });
-  port.postMessage(message);
 }
 
 // --- Media detection -------------------------------------------------------
@@ -248,12 +256,16 @@ function fileNameFor(item, title) {
 
 async function downloadItem(tabId, item) {
   const tab = await chrome.tabs.get(tabId);
-  sendToHost({
-    type: item.kind === "video" ? "download" : "stream",
-    url: item.url,
-    filename: fileNameFor(item, tab.title),
-    headers: item.headers,
-  });
+  const filename = fileNameFor(item, tab.title);
+  startDownload(
+    {
+      type: item.kind === "video" ? "download" : "stream",
+      url: item.url,
+      filename,
+      headers: item.headers,
+    },
+    filename
+  );
 }
 
 // --- Video sites (yt-dlp) ---------------------------------------------------
@@ -273,8 +285,8 @@ function isSitePage(url) {
   return SITE_PAGES.some((pattern) => pattern.test(url || ""));
 }
 
-function downloadSite(url) {
-  sendToHost({ type: "site", url });
+function downloadSite(url, title) {
+  startDownload({ type: "site", url }, title);
 }
 
 // --- Quality menu -----------------------------------------------------------
@@ -313,24 +325,28 @@ async function listFormats(target) {
   }
 }
 
-async function downloadFormat(target, selector) {
+async function downloadFormat(target, selector, label) {
   const { tabId, item } = target;
+  const tab = await chrome.tabs.get(tabId);
+  const title = label ? `${tab.title} (${label})` : tab.title;
   if (item.kind === "site") {
-    sendToHost({ type: "site", url: item.url, format: selector });
+    startDownload({ type: "site", url: item.url, format: selector }, title);
   } else if (item.kind === "video" || selector === null) {
     // The best quality of a detected stream goes through ffmpeg, which
     // doesn't need yt-dlp.
     downloadItem(tabId, item);
   } else {
     // A specific quality of a detected stream: yt-dlp reads the manifest.
-    const tab = await chrome.tabs.get(tabId);
-    sendToHost({
-      type: "site",
-      url: item.url,
-      format: selector,
-      title: tab.title,
-      headers: item.headers,
-    });
+    startDownload(
+      {
+        type: "site",
+        url: item.url,
+        format: selector,
+        title: tab.title,
+        headers: item.headers,
+      },
+      title
+    );
   }
 }
 
@@ -354,7 +370,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     // …and this starts the one picked. `target` comes back from list-formats.
     case "download-format":
-      downloadFormat(message.target, message.selector);
+      downloadFormat(message.target, message.selector, message.label);
       return false;
 
     case "list-media":
@@ -372,7 +388,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     case "download-item":
       if (message.kind === "site") {
-        downloadSite(message.url);
+        chrome.tabs.get(message.tabId).then((tab) => downloadSite(message.url, tab.title));
         return false;
       }
       loadTabMedia(message.tabId).then((media) => {
@@ -395,9 +411,11 @@ chrome.downloads.onCreated.addListener((downloadItem) => {
   chrome.downloads.cancel(downloadItem.id);
   chrome.downloads.erase({ id: downloadItem.id });
 
-  sendToHost({
-    type: "download",
-    url: downloadItem.url,
-    destination: downloadItem.filename,
-  });
+  // The browser's chosen name (it may be empty this early in Chrome), else
+  // the URL's last path segment. The folder is picked in the download window.
+  const filename =
+    downloadItem.filename.split(/[\\/]/).pop() ||
+    decodeURIComponent(new URL(downloadItem.url).pathname.split("/").pop() || "") ||
+    "download";
+  startDownload({ type: "download", url: downloadItem.url, filename }, filename);
 });

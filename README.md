@@ -44,6 +44,15 @@ cargo build --workspace
      Load the extension via `about:debugging#/runtime/this-firefox` → **Load Temporary Add-on…** →
      pick `extension/manifest.json`.
 
+## Download window
+
+Every download (intercepted browser downloads, the overlay button, the popup) opens a small
+window to choose the destination folder (the system folder picker, via the native host; the last
+folder is remembered), then shows a progress bar, size and speed, and any error. Closing the
+window or pressing Cancel stops the download: the native host exits as soon as the browser closes
+its connection, and on Windows a job object takes ffmpeg/yt-dlp down with it. The partially
+downloaded file is left behind.
+
 ## Streaming videos
 
 The extension watches network requests (`webRequest`) for HLS (`.m3u8`), DASH (`.mpd`) and
@@ -78,7 +87,6 @@ Not supported: DRM-protected streams (Netflix, Disney+…).
 
 ## Roadmap (not implemented yet)
 
-- Cancel a running download (and kill its ffmpeg process if the host is killed)
 
 - Parallel chunked downloads with `Range` requests and resume after interruption
 - Persistent download queue (survive app restarts)
